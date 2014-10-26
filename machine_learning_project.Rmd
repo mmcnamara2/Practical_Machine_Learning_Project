@@ -1,0 +1,66 @@
+Practical Machine Learning Project
+========================================================
+```{r echo=FALSE,results=FALSE}
+library(caret)
+```
+
+## Synopsis
+In this report, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to try and predict how well an exercise is being performed.  In this case the exercise being performed is a dumbbell curl.
+
+## Loading and Processing
+
+First the training data is loaded.  Given the sufficient sample size the training set is immediately split into training and testing sets for cross validation purposes.  I used a 70/30 split (training/testing) from the original training data.  Henceforth all exploration, manipulation, and model creation will only use this sub partition of the original training set.
+
+
+```{r cache=TRUE}
+training <- read.csv("pml-training.csv")
+inTrain <- createDataPartition(y=training$classe,p=.7,list=F)
+training_data <- training[inTrain,]
+testing_data <- training[-inTrain,]
+```
+
+A quick review of the data reveals that there are a number of variables that are almost entirely missing.  These variables will therefore add nothing to and possibly detract from our models so they are removed.  Those columns are all removed along with a series of other non-numeric variables such as user_name which add nothing to a prediction model.
+
+```{r cache=TRUE}
+training_data <- training_data[,colSums(is.na(training_data))==0]
+training_data <- training_data[,colSums(training_data =="")==0]
+training_data <- training_data[,8:60]
+```
+
+## Model Creation and Selection
+
+Given that we are trying to predict a categorical variable as opposed to a continuous variable I decided to narrow my possible models down to Trees and Random Forests.  The two models were created with the following code:
+
+``` {r eval=FALSE}
+modFit <- train(classe ~ .,data=training_data,method="rf",prox=F)
+modFit2 <- train(classe ~.,data=training_data,method="rpart")
+```
+
+The Random Forest model gives 98.8% in sample accuracy compared to a rather weak 49.5% for the Tree model.  As a result I chose to go with the Random Forest model and continue on towards testing on the separate partition of test data I created.
+
+## Cross Validation
+
+Since I have chosen to go with the Random Forest model I will detail my cross validation efforts solely for this model.  The creation of the Random Forest model using the caret package has some default cross validation built into the process.  A resampling through 25 different iterations of the data is used to better mimic out of sample accuracy.  As a result I would expect the out of sample accuracy and by extension the out of sample error to be quite similar to what I got in my model.  I would build in some expectation that the out of sample error will be just slightly worse since that is almost always the case.
+
+```{r eval=FALSE}
+testing_data <- testing_data[,colSums(is.na(testing_data))==0]
+testing_data <- testing_data[,colSums(testing_data =="")==0]
+testing_data <- testing_data[,8:60]
+pred <- predict(modFit,testing_data)
+sum(pred==testing_data$classe)/length(pred)
+```
+
+
+Testing on the separate partition of training data I found that accuracy was actually 99.2% which was slightly higher than what the model gave in sample.  I was very careful to perform the same data manipulation on the testing set that was done on the training.
+
+A Confusion Matrix shows the breakdown by class also illustrating that no specific class is being misclassified an inordinate amount of time.
+
+```{r echo=FALSE}
+pred <- read.csv(file="pred.csv")
+pred <- pred$x
+actual <- read.csv(file="actual.csv")
+actual <- actual$x
+confusionMatrix(pred,actual)$table
+```
+
+As a final validation the actual test set was loaded and predictions generated.  Accuracy was 100% for this final test set.
